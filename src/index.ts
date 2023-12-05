@@ -41,21 +41,23 @@ try {
     allowEIO3: true,
   });
 
-  io.on("connection", (socket) => {
+  const bizSplittingToolIO = io.of("/biz-splitting-tool");
+
+  bizSplittingToolIO.on("connection", (socket) => {
     ioDebug("connection established!");
-    io.to(`${socket.id}`).emit("init-room");
+    bizSplittingToolIO.to(`${socket.id}`).emit("init-room");
     socket.on("join-room", async (roomID) => {
       socketDebug(`${socket.id} has joined ${roomID}`);
       await socket.join(roomID);
-      const sockets = await io.in(roomID).fetchSockets();
+      const sockets = await bizSplittingToolIO.in(roomID).fetchSockets();
       if (sockets.length <= 1) {
-        io.to(`${socket.id}`).emit("first-in-room");
+        bizSplittingToolIO.to(`${socket.id}`).emit("first-in-room");
       } else {
         socketDebug(`${socket.id} new-user emitted to room ${roomID}`);
         socket.broadcast.to(roomID).emit("new-user", socket.id);
       }
 
-      io.in(roomID).emit(
+      bizSplittingToolIO.in(roomID).emit(
         "room-user-change",
         sockets.map((socket) => socket.id),
       );
@@ -82,9 +84,9 @@ try {
     socket.on("disconnecting", async () => {
       socketDebug(`${socket.id} has disconnected`);
       for (const roomID in socket.rooms) {
-        const otherClients = (await io.in(roomID).fetchSockets()).filter(
-          (_socket) => _socket.id !== socket.id,
-        );
+        const otherClients = (
+          await bizSplittingToolIO.in(roomID).fetchSockets()
+        ).filter((_socket) => _socket.id !== socket.id);
 
         if (otherClients.length > 0) {
           socket.broadcast.to(roomID).emit(
